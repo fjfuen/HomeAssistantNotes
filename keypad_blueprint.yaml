@@ -1,6 +1,6 @@
 blueprint:
   name: Ring Keypad Automations
-  description: Automations to use the Ring Keypad with an Alarm Panel integration.  See https://github.com/ImSorryButWho/HomeAssistantNotes/blob/main/RingKeypadV2.md for more information.
+  description: Automations to use the Ring Keypad with an Alarm Panel integration. See https://github.com/ImSorryButWho/HomeAssistantNotes/blob/main/RingKeypadV2.md for more information. Forked and extended to support armed_night and armed_vacation Alarmo modes.
   domain: automation
   input:
     keypad:
@@ -35,6 +35,7 @@ blueprint:
       default: []
       selector:
         action:
+
 variables:
   alarm: !input alarm
   formatted_delay: >
@@ -43,10 +44,12 @@ variables:
     {% set minutes = total_seconds // 60 %}
     {% set seconds = total_seconds % 60 %}
     {{ minutes }}m{{ seconds }}s
+
 mode: parallel
 max: 10
 trace:
   stored_traces: 0
+
 trigger:
   - platform: event
     event_type: "zwave_js_notification"
@@ -55,6 +58,7 @@ trigger:
       device_id: !input keypad
       event_type: 2
     id: code_entered
+
   - platform: event
     event_type: "zwave_js_notification"
     event_data:
@@ -62,6 +66,7 @@ trigger:
       device_id: !input keypad
       event_type: 3
     id: keypad_disarm
+
   - platform: event
     event_type: "zwave_js_notification"
     event_data:
@@ -69,6 +74,7 @@ trigger:
       device_id: !input keypad
       event_type: 5
     id: keypad_arm_away
+
   - platform: event
     event_type: "zwave_js_notification"
     event_data:
@@ -76,6 +82,7 @@ trigger:
       device_id: !input keypad
       event_type: 6
     id: keypad_arm_home
+
   - platform: event
     event_type: zwave_js_notification
     event_data:
@@ -83,6 +90,7 @@ trigger:
       device_id: !input 'keypad'
       event_type: 16
     id: keypad_fire
+
   - platform: event
     event_type: zwave_js_notification
     event_data:
@@ -90,6 +98,7 @@ trigger:
       device_id: !input 'keypad'
       event_type: 17
     id: keypad_police
+
   - platform: event
     event_type: zwave_js_notification
     event_data:
@@ -97,47 +106,71 @@ trigger:
       device_id: !input 'keypad'
       event_type: 19
     id: keypad_medical
+
   - platform: event
     event_type: "alarmo_failed_to_arm"
     event_data:
       reason: "invalid_code"
     id: invalid_code
+
   - platform: event
     event_type: "alarmo_failed_to_arm"
     event_data:
       reason: "open_sensors"
     id: need_bypass
+
   - platform: state
     entity_id: !input alarm
     to: disarmed
     id: alarm_disarmed
+
   - platform: state
     entity_id: !input alarm
     to: arming
     id: alarm_arming
+
   - platform: state
     entity_id: !input alarm
     to: armed_away
     id: alarm_armed_away
+
   - platform: state
     entity_id: !input alarm
     to: armed_home
     id: alarm_armed_home
+
+  # Added: armed_night support
+  - platform: state
+    entity_id: !input alarm
+    to: armed_night
+    id: alarm_armed_night
+
+  # Added: armed_vacation support
+  - platform: state
+    entity_id: !input alarm
+    to: armed_vacation
+    id: alarm_armed_vacation
+
   - platform: state
     entity_id: !input alarm
     to: pending
     id: alarm_pending
+
   - platform: state
     entity_id: !input alarm
     to: triggered
     id: alarm_triggered
+
 condition:
   condition: not
   conditions:
     - condition: template
       value_template: "{{ ('from_state' in trigger) and (trigger.from_state.state == 'unknown') }}"
+
 action:
   choose:
+
+    # Disarm — triggered by code+enter or dedicated disarm button
     - conditions:
         - condition: trigger
           id:
@@ -151,6 +184,8 @@ action:
               {% if trigger.event.data.event_data != none %}
                 {{ trigger.event.data.event_data }}
               {% endif %}
+
+    # Arm Away or Arm Home from keypad — only works when disarmed
     - conditions:
         - condition: and
           conditions:
@@ -192,6 +227,8 @@ action:
               {% if trigger.event.data.event_data != none %}
                 {{ trigger.event.data.event_data }}
               {% endif %}
+
+    # Invalid code — play error tone
     - conditions:
         - condition: trigger
           id:
@@ -206,6 +243,8 @@ action:
             property: "9"
             property_key: "1"
             value: 99
+
+    # Open sensors — show bypass prompt on keypad
     - conditions:
         - condition: trigger
           id: need_bypass
@@ -219,6 +258,8 @@ action:
             property: "16"
             property_key: "1"
             value: 99
+
+    # Disarmed — show disarmed indicator
     - conditions:
         - condition: trigger
           id: alarm_disarmed
@@ -232,6 +273,8 @@ action:
             property: "2"
             property_key: "1"
             value: 99
+
+    # Armed Away — show armed away indicator
     - conditions:
         - condition: trigger
           id: alarm_armed_away
@@ -245,6 +288,8 @@ action:
             property: "11"
             property_key: "1"
             value: 99
+
+    # Armed Home — show armed home/stay indicator
     - conditions:
         - condition: trigger
           id: alarm_armed_home
@@ -258,6 +303,38 @@ action:
             property: "10"
             property_key: "1"
             value: 99
+
+    # Added: Armed Night — show armed home/stay indicator (closest match on keypad hardware)
+    - conditions:
+        - condition: trigger
+          id: alarm_armed_night
+      sequence:
+        - service: zwave_js.set_value
+          target:
+            device_id: !input keypad
+          data:
+            command_class: "135"
+            endpoint: "0"
+            property: "10"
+            property_key: "1"
+            value: 99
+
+    # Added: Armed Vacation — show armed away indicator (vacation is extended away)
+    - conditions:
+        - condition: trigger
+          id: alarm_armed_vacation
+      sequence:
+        - service: zwave_js.set_value
+          target:
+            device_id: !input keypad
+          data:
+            command_class: "135"
+            endpoint: "0"
+            property: "11"
+            property_key: "1"
+            value: 99
+
+    # Arming — play exit delay countdown
     - conditions:
         - condition: trigger
           id: alarm_arming
@@ -271,6 +348,8 @@ action:
             property: "18"
             property_key: "timeout"
             value: "{{ formatted_delay }}"
+
+    # Pending — play entry delay countdown
     - conditions:
         - condition: trigger
           id: alarm_pending
@@ -284,6 +363,8 @@ action:
             property: "17"
             property_key: "timeout"
             value: "{{ formatted_delay }}"
+
+    # Triggered — sound burglar alarm at full volume
     - conditions:
         - condition: trigger
           id: alarm_triggered
@@ -297,15 +378,19 @@ action:
             property: "13"
             property_key: "9"
             value: 99
+
+    # Emergency buttons
     - conditions:
-      - condition: trigger
-        id: keypad_fire
+        - condition: trigger
+          id: keypad_fire
       sequence: !input selected_action_fire
+
     - conditions:
-      - condition: trigger
-        id: keypad_police
+        - condition: trigger
+          id: keypad_police
       sequence: !input selected_action_police
+
     - conditions:
-      - condition: trigger
-        id: keypad_medical
+        - condition: trigger
+          id: keypad_medical
       sequence: !input selected_action_medical
