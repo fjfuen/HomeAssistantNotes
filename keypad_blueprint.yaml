@@ -259,11 +259,17 @@ action:
             property_key: "1"
             value: 99
 
-    # Disarmed — show disarmed indicator
+    # Disarmed — show disarmed indicator, reset siren to full volume
     - conditions:
         - condition: trigger
           id: alarm_disarmed
       sequence:
+        - service: zwave_js.set_config_parameter
+          target:
+            device_id: !input keypad
+          data:
+            parameter: 6
+            value: 10
         - service: zwave_js.set_value
           target:
             device_id: !input keypad
@@ -274,11 +280,17 @@ action:
             property_key: "1"
             value: 99
 
-    # Armed Away — show armed away indicator
+    # Armed Away — show armed away indicator, lower siren volume for dog
     - conditions:
         - condition: trigger
           id: alarm_armed_away
       sequence:
+        - service: zwave_js.set_config_parameter
+          target:
+            device_id: !input keypad
+          data:
+            parameter: 6
+            value: 3
         - service: zwave_js.set_value
           target:
             device_id: !input keypad
@@ -289,11 +301,17 @@ action:
             property_key: "1"
             value: 99
 
-    # Armed Home — show armed home/stay indicator
+    # Armed Home — show armed home/stay indicator, lower siren volume (people home)
     - conditions:
         - condition: trigger
           id: alarm_armed_home
       sequence:
+        - service: zwave_js.set_config_parameter
+          target:
+            device_id: !input keypad
+          data:
+            parameter: 6
+            value: 3
         - service: zwave_js.set_value
           target:
             device_id: !input keypad
@@ -304,11 +322,17 @@ action:
             property_key: "1"
             value: 99
 
-    # Added: Armed Night — show armed home/stay indicator (closest match on keypad hardware)
+    # Added: Armed Night — show armed home/stay indicator, full siren volume (sleeping)
     - conditions:
         - condition: trigger
           id: alarm_armed_night
       sequence:
+        - service: zwave_js.set_config_parameter
+          target:
+            device_id: !input keypad
+          data:
+            parameter: 6
+            value: 10
         - service: zwave_js.set_value
           target:
             device_id: !input keypad
@@ -319,11 +343,17 @@ action:
             property_key: "1"
             value: 99
 
-    # Added: Armed Vacation — show armed away indicator (vacation is extended away)
+    # Added: Armed Vacation — show armed away indicator, full siren volume (nobody home)
     - conditions:
         - condition: trigger
           id: alarm_armed_vacation
       sequence:
+        - service: zwave_js.set_config_parameter
+          target:
+            device_id: !input keypad
+          data:
+            parameter: 6
+            value: 10
         - service: zwave_js.set_value
           target:
             device_id: !input keypad
